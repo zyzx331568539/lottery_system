@@ -1,0 +1,271 @@
+{
+  "analysis_type": "daily_pick",
+  "started_at": "2026-09-30T08:22:32",
+  "data_snapshot": {
+    "count": 40,
+    "first_period": 2026223,
+    "last_period": 2026262,
+    "first_date": "2026-08-21",
+    "last_date": "2026-09-29",
+    "periods": [
+      2026223,
+      2026224,
+      2026225,
+      2026226,
+      2026227,
+      2026228,
+      2026229,
+      2026230,
+      2026231,
+      2026232,
+      2026233,
+      2026234,
+      2026235,
+      2026236,
+      2026237,
+      2026238,
+      2026239,
+      2026240,
+      2026241,
+      2026242,
+      2026243,
+      2026244,
+      2026245,
+      2026246,
+      2026247,
+      2026248,
+      2026249,
+      2026250,
+      2026251,
+      2026252,
+      2026253,
+      2026254,
+      2026255,
+      2026256,
+      2026257,
+      2026258,
+      2026259,
+      2026260,
+      2026261,
+      2026262
+    ],
+    "sources": [
+      "crawl",
+      "seed"
+    ]
+  },
+  "params": {
+    "recent_window": 10,
+    "hot_z": 1.28,
+    "cold_z": -1.28,
+    "gap_cold": 8,
+    "gap_active": 1,
+    "w_full": 0.3,
+    "w_recent": 0.35,
+    "w_gap": 0.15,
+    "w_segment": 0.2,
+    "shortlist": 8,
+    "softmax_tau": 1.0
+  },
+  "intermediate": {
+    "hot_cold_summary": {
+      "hot": [
+        2,
+        54,
+        61,
+        72,
+        73
+      ],
+      "cold_recent": [
+        3,
+        70
+      ],
+      "cold_gap": [
+        3,
+        41,
+        43,
+        69,
+        70
+      ]
+    },
+    "segments_chi_square": 3.88,
+    "shortlist": [
+      73,
+      61,
+      24,
+      2,
+      50,
+      42,
+      23,
+      26
+    ],
+    "combo_ranked_top10": [
+      {
+        "combo": [
+          42,
+          50,
+          61,
+          73
+        ],
+        "score": 3.275,
+        "parts": {
+          "number_z": 2.21,
+          "pair_z": 3.389,
+          "four_z": 5.363,
+          "spread": 0.667
+        }
+      },
+      {
+        "combo": [
+          23,
+          42,
+          61,
+          73
+        ],
+        "score": 3.024,
+        "parts": {
+          "number_z": 1.957,
+          "pair_z": 2.834,
+          "four_z": 5.363,
+          "spread": 1.0
+        }
+      },
+      {
+        "combo": [
+          2,
+          42,
+          61,
+          73
+        ],
+        "score": 2.2189,
+        "parts": {
+          "number_z": 1.979,
+          "pair_z": 2.502,
+          "four_z": 2.507,
+          "spread": 1.0
+        }
+      },
+      {
+        "combo": [
+          26,
+          42,
+          50,
+          73
+        ],
+        "score": 1.9748,
+        "parts": {
+          "number_z": 1.66,
+          "pair_z": 2.169,
+          "four_z": 2.507,
+          "spread": 0.667
+        }
+      },
+      {
+        "combo": [
+          26,
+          50,
+          61,
+          73
+        ],
+        "score": 1.9316,
+        "parts": {
+          "number_z": 1.593,
+          "pair_z": 2.059,
+          "four_z": 2.507,
+          "spread": 1.0
+        }
+      },
+      {
+        "combo": [
+          23,
+          42,
+          50,
+          61
+        ],
+        "score": 1.9226,
+        "parts": {
+          "number_z": 1.696,
+          "pair_z": 1.948,
+          "four_z": 2.507,
+          "spread": 0.667
+        }
+      },
+      {
+        "combo": [
+          23,
+          42,
+          50,
+          73
+        ],
+        "score": 1.7982,
+        "parts": {
+          "number_z": 1.634,
+          "pair_z": 1.615,
+          "four_z": 2.507,
+          "spread": 0.667
+        }
+      },
+      {
+        "combo": [
+          26,
+          42,
+          61,
+          73
+        ],
+        "score": 1.7722,
+        "parts": {
+          "number_z": 1.983,
+          "pair_z": 3.389,
+          "four_z": -0.35,
+          "spread": 1.0
+        }
+      },
+      {
+        "combo": [
+          23,
+          50,
+          61,
+          73
+        ],
+        "score": 1.755,
+        "parts": {
+          "number_z": 1.568,
+          "pair_z": 1.504,
+          "four_z": 2.507,
+          "spread": 1.0
+        }
+      },
+      {
+        "combo": [
+          24,
+          42,
+          61,
+          73
+        ],
+        "score": 1.4088,
+        "parts": {
+          "number_z": 1.822,
+          "pair_z": 2.391,
+          "four_z": -0.35,
+          "spread": 1.0
+        }
+      }
+    ]
+  },
+  "final": {
+    "numbers": [
+      42,
+      50,
+      61,
+      73
+    ],
+    "combo_score": 3.27495
+  },
+  "perf": {
+    "elapsed_ms": 58.58,
+    "budget_ms": 2000,
+    "within_budget": true
+  },
+  "finished_at": "2026-09-30T08:22:32",
+  "integrity_sha256": "0396e254f7bf61d87d8448a0be1c1cf8a4c1dc76fc02679d9d4a747d6f771e8d"
+}

@@ -1,0 +1,187 @@
+{
+  "analysis_type": "daily_pick_m1",
+  "started_at": "2026-09-29T17:22:42",
+  "data_snapshot": {
+    "count": 39,
+    "first_period": 2026223,
+    "last_period": 2026261,
+    "first_date": "2026-08-21",
+    "last_date": "2026-09-28",
+    "periods": [
+      2026223,
+      2026224,
+      2026225,
+      2026226,
+      2026227,
+      2026228,
+      2026229,
+      2026230,
+      2026231,
+      2026232,
+      2026233,
+      2026234,
+      2026235,
+      2026236,
+      2026237,
+      2026238,
+      2026239,
+      2026240,
+      2026241,
+      2026242,
+      2026243,
+      2026244,
+      2026245,
+      2026246,
+      2026247,
+      2026248,
+      2026249,
+      2026250,
+      2026251,
+      2026252,
+      2026253,
+      2026254,
+      2026255,
+      2026256,
+      2026257,
+      2026258,
+      2026259,
+      2026260,
+      2026261
+    ],
+    "sources": [
+      "crawl",
+      "seed"
+    ]
+  },
+  "params": {
+    "recent_window": 10,
+    "hot_z": 1.28,
+    "cold_z": -1.28,
+    "gap_cold": 8,
+    "gap_active": 1,
+    "w_full": 0.3,
+    "w_recent": 0.35,
+    "w_gap": 0.15,
+    "w_segment": 0.2,
+    "shortlist": 8,
+    "softmax_tau": 1.0,
+    "size": 1
+  },
+  "intermediate": {
+    "size": 1,
+    "hot_cold_summary": {
+      "hot": [
+        2,
+        50,
+        72
+      ],
+      "cold_recent": [
+        70
+      ],
+      "cold_gap": [
+        3,
+        41,
+        70
+      ]
+    },
+    "segments_chi_square": 3.3231,
+    "shortlist": [
+      2,
+      50,
+      52,
+      8,
+      24,
+      36,
+      54,
+      13
+    ],
+    "combo_ranked_top10": [
+      {
+        "combo": [
+          52
+        ],
+        "score": 1.9982,
+        "parts": {
+          "number_z": 1.998
+        }
+      },
+      {
+        "combo": [
+          50
+        ],
+        "score": 1.4224,
+        "parts": {
+          "number_z": 1.422
+        }
+      },
+      {
+        "combo": [
+          8
+        ],
+        "score": 1.1597,
+        "parts": {
+          "number_z": 1.16
+        }
+      },
+      {
+        "combo": [
+          36
+        ],
+        "score": 0.8639,
+        "parts": {
+          "number_z": 0.864
+        }
+      },
+      {
+        "combo": [
+          54
+        ],
+        "score": 0.774,
+        "parts": {
+          "number_z": 0.774
+        }
+      },
+      {
+        "combo": [
+          2
+        ],
+        "score": 0.4732,
+        "parts": {
+          "number_z": 0.473
+        }
+      },
+      {
+        "combo": [
+          13
+        ],
+        "score": 0.2371,
+        "parts": {
+          "number_z": 0.237
+        }
+      },
+      {
+        "combo": [
+          24
+        ],
+        "score": -0.185,
+        "parts": {
+          "number_z": -0.185
+        }
+      }
+    ]
+  },
+  "final": {
+    "size": 1,
+    "numbers": [
+      52
+    ],
+    "combo_score": 1.99819
+  },
+  "perf": {
+    "elapsed_ms": 49.14,
+    "budget_ms": 2000,
+    "within_budget": true
+  },
+  "finished_at": "2026-09-29T17:22:42",
+  "integrity_sha256": "4cd4cc3a3b4c47ef48178439a64d845b1134025ba6a93f5558cd9a483c9d2907"
+}

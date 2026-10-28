@@ -1,0 +1,9 @@
+{
+  "source_type": "url_html",
+  "url": "",
+  "html_profile": "ydniu_kl8",
+  "on_duplicate": "skip",
+  "auto_update": true,
+  "check_interval_seconds": 3600,
+  "http_timeout_seconds": 10
+}

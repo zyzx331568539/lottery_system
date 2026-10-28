@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n="app_title">80码 · 4码组合分析与推荐系统</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div>
+    <h1 data-i18n="app_title">80码 · 4码组合分析与推荐系统</h1>
+    <p class="sub" data-i18n="app_sub">概率分析 · 数据池管理 · 第 N+1 日推荐</p>
+  </div>
+  <div class="head-right">
+    <div id="status" class="status" data-i18n="status_loading">加载中…</div>
+    <div class="lang-switch" role="group" aria-label="language">
+      <button type="button" data-lang="zh" class="lang-btn active">中文</button>
+      <button type="button" data-lang="en" class="lang-btn">EN</button>
+    </div>
+  </div>
+</header>
+
+<main class="grid">
+
+  <!-- 0. Core scientific pick (80 -> 4) -->
+  <section class="card span2 core-card">
+    <h2 data-i18n="s0_title">1 · 科学筛选（80 → 4）</h2>
+    <p class="hint" data-i18n="s0_hint">严格基于历史数据统计：冷热号码识别（近期频次检验 + 遗漏分析）、八区段分布、多因子评分。全程确定性计算，无任何随机抽取。</p>
+    <div class="row">
+      <button id="btnFull" class="primary" data-i18n="btn_full">生成今日 4 码筛选</button>
+      <span class="small" data-i18n="s0_note">每次分析自动归档完整过程（数据快照 / 参数 / 中间结果 / 最终输出）</span>
+    </div>
+    <div id="fullOut" class="output"></div>
+  </section>
+
+  <!-- 1. Analyze -->
+  <section class="card span2">
+    <h2 data-i18n="s1_title">2 · 概率分析</h2>
+    <p class="hint" data-i18n="s1_hint">请输入恰好 4 个号码（1–80），用空格或逗号分隔。</p>
+    <div class="row">
+      <input id="comboInput" type="text" data-i18n-ph="ph_combo"
+             placeholder="例如 42 61 65 72" autocomplete="off">
+      <button id="btnAnalyze" data-i18n="btn_analyze">分析</button>
+      <button id="btnOptimize" class="secondary" data-i18n="btn_optimize">补充与优化</button>
+    </div>
+    <div id="analyzeOut" class="output"></div>
+    <div id="optimizeOut" class="output"></div>
+  </section>
+
+  <!-- 2. Recommendation -->
+  <section class="card span2">
+    <h2 data-i18n="s2_title">3 · 第 N+1 日推荐</h2>
+    <div class="row">
+      <label><span data-i18n="s2_use_last">使用最近</span>
+        <input id="lastN" type="number" min="5" step="1" data-i18n-ph="ph_all"
+               placeholder="全部" style="width:90px">
+        <span data-i18n="s2_periods_blank">期（留空 = 全部）</span></label>
+      <label><span data-i18n="s2_top">前</span>
+        <input id="topK" type="number" min="1" max="10" value="5" style="width:64px"></label>
+      <label class="small"><input type="checkbox" id="autoStrategy"> <span data-i18n="s2_auto">自适应窗口（按历史命中率自动选 last_n）</span></label>
+      <button id="btnRecommend" data-i18n="btn_generate">生成</button>
+    </div>
+    <div id="recommendOut" class="output"></div>
+  </section>
+
+  <!-- 3. Manual entry -->
+  <section class="card">
+    <h2 data-i18n="s3_title">4 · 手工录入历史数据</h2>
+    <p class="hint"><span data-i18n="s3_hint_a">每行一期。支持格式：</span><br>
+      <code data-i18n="s3_hint_b">20个号码 · 期号+20个号码 · 期号+日期(YYYY-MM-DD)+20个号码</code></p>
+    <textarea id="manualText" rows="8" data-i18n-ph="ph_manual"
+      placeholder="2026253 2026-09-10 3 7 12 …（共20个号码）"></textarea>
+    <div class="row">
+      <label class="small"><input type="checkbox" id="replaceDup"> <span data-i18n="s3_replace">覆盖已存在的期号</span></label>
+      <button id="btnManual" data-i18n="btn_submit">提交</button>
+    </div>
+    <div id="manualOut" class="output"></div>
+  </section>
+
+  <!-- 4. Crawler -->
+  <section class="card">
+    <h2 data-i18n="s4_title">5 · 每日爬虫</h2>
+    <p class="hint" data-i18n="s4_hint">数据池陈旧（超过26小时）时更新。生产环境请配置真实的 url_text / url_json 数据源；默认为明确标注的 DEMO 演示生成器。</p>
+    <div class="row">
+      <label class="small"><input type="checkbox" id="forceCrawl" checked> <span data-i18n="s4_force">即使数据新鲜也执行</span></label>
+      <label class="small"><input type="checkbox" id="crawlReplace"> <span data-i18n="s4_replace">覆盖已存在的期号</span></label>
+    </div>
+    <div class="row">
+      <button id="btnCrawl" data-i18n="btn_crawl">立即抓取</button>
+      <button id="btnTestCrawl" class="secondary" data-i18n="btn_test_crawl">测试抓取（不写库）</button>
+    </div>
+    <div id="crawlOut" class="output"></div>
+    <hr>
+    <label class="small"><span data-i18n="s4_source">数据源类型</span>
+      <select id="srcType">
+        <option value="mock">mock (DEMO)</option>
+        <option value="url_text">url_text</option>
+        <option value="url_json">url_json</option>
+        <option value="url_html">url_html (ydniu KL8)</option>
+      </select>
+    </label>
+    <input id="srcUrl" type="text" data-i18n-ph="ph_url"
+           placeholder="https://example.com/draws.txt" style="margin:6px 0;width:100%">
+    <label class="small"><input type="checkbox" id="autoUpdate"> <span data-i18n="s4_auto">启用每日自动更新</span></label>
+    <div class="row"><button id="btnSaveCfg" class="secondary" data-i18n="btn_save_cfg">保存配置</button></div>
+  </section>
+
+  <!-- 5. Backtest -->
+  <section class="card span2">
+    <h2 data-i18n="s5_title">6 · 历史回测验证</h2>
+    <p class="hint" data-i18n="s5_hint">严格时间切片：每期只用开奖前的数据走与线上完全相同的筛选路径，再核对命中数；并与随机选号的超几何分布基准对比。</p>
+    <div class="row">
+      <label><span data-i18n="s5_window">训练窗口</span>
+        <input id="btWindow" type="number" min="5" value="20" style="width:80px">
+        <span data-i18n="s5_window_unit">期</span></label>
+      <button id="btnBacktest" data-i18n="btn_run_bt">运行回测</button>
+    </div>
+    <div id="backtestOut" class="output"></div>
+  </section>
+
+  <!-- 6. Analysis logs -->
+  <section class="card span2">
+    <h2 data-i18n="s6_title">7 · 分析过程日志（透明度监控）</h2>
+    <div class="row">
+      <button id="btnLoadLogs" class="secondary" data-i18n="btn_load_logs">刷新日志列表</button>
+      <span class="small" data-i18n="s6_note">归档文件位于 data/analysis_logs/，含完整性哈希</span>
+    </div>
+    <div id="logsOut" class="output"></div>
+    <div id="logDetailOut" class="output"></div>
+  </section>
+
+  <!-- 7. Multi-size extension (1/2/3/4) -->
+  <section class="card span2" id="msizeCard">
+    <h2 data-i18n="sm_title">8 · 多规模扩展（1 / 2 / 3 / 4 码）</h2>
+    <p class="hint" data-i18n="sm_hint">与 4 码完全一致的统计口径与操作流程，仅改变所选号码数量；选 4 码时仍调用原算法（未做任何改动），1/2/3 码复用同一管道。</p>
+    <div class="row">
+      <span class="small" data-i18n="sm_size">选号数量</span>
+      <div class="size-switch" role="group" aria-label="size">
+        <button type="button" class="size-btn active" data-size="1">1</button>
+        <button type="button" class="size-btn" data-size="2">2</button>
+        <button type="button" class="size-btn" data-size="3">3</button>
+        <button type="button" class="size-btn" data-size="4">4</button>
+      </div>
+      <span class="small" id="msSizeNote"></span>
+    </div>
+
+    <h3 data-i18n="sm_theory_t">理论概率对比（超几何精确值，与选号策略无关）</h3>
+    <div id="msTheoryOut" class="output"></div>
+
+    <h3 data-i18n="sm_analyze_t">概率分析</h3>
+    <div class="row">
+      <input id="msInput" type="text" data-i18n-ph="sm_ph_input"
+             placeholder="号码个数需等于选号数量，空格/逗号分隔" autocomplete="off">
+      <button id="btnMsAnalyze" data-i18n="btn_analyze">分析</button>
+    </div>
+    <div id="msAnalyzeOut" class="output"></div>
+
+    <h3 data-i18n="sm_pick_t">科学筛选（80 → 前8 → N 码）</h3>
+    <div class="row">
+      <button id="btnMsPick" class="primary" data-i18n="sm_btn_pick">生成今日筛选</button>
+      <span class="small" data-i18n="sm_pick_note">与 4 码同一管道：多因子评分取前 8 名后枚举组合；每次分析自动归档</span>
+    </div>
+    <div id="msPickOut" class="output"></div>
+
+    <h3 data-i18n="sm_rec_t">第 N+1 日推荐</h3>
+    <div class="row">
+      <label><span data-i18n="s2_use_last">使用最近</span>
+        <input id="msLastN" type="number" min="5" step="1" data-i18n-ph="ph_all"
+               placeholder="全部" style="width:90px">
+        <span data-i18n="s2_periods_blank">期（留空 = 全部）</span></label>
+      <label><span data-i18n="s2_top">前</span>
+        <input id="msTopK" type="number" min="1" max="10" value="5" style="width:64px"></label>
+      <label class="small"><input type="checkbox" id="msAutoStrategy"> <span data-i18n="s2_auto">自适应窗口</span></label>
+      <button id="btnMsRecommend" data-i18n="btn_generate">生成</button>
+    </div>
+    <div id="msRecommendOut" class="output"></div>
+
+    <h3 data-i18n="sm_bt_t">历史回测验证</h3>
+    <div class="row">
+      <label><span data-i18n="s5_window">训练窗口</span>
+        <input id="msBtWindow" type="number" min="5" value="20" style="width:80px">
+        <span data-i18n="s5_window_unit">期</span></label>
+      <button id="btnMsBacktest" data-i18n="btn_run_bt">运行回测</button>
+    </div>
+    <div id="msBacktestOut" class="output"></div>
+  </section>
+
+  <!-- 8. Recommendation hit tracking -->
+  <section class="card span2" id="trackCard">
+    <h2 data-i18n="st_title">9 · 推荐命中追踪</h2>
+    <p class="hint" data-i18n="st_hint">每次生成的推荐会自动记录（预测目标期号 = 最新期号+1）；新开奖入库后自动对比，统计命中率并据此自适应选窗口。</p>
+    <div class="row">
+      <button id="btnTrackRefresh" class="primary" data-i18n="st_refresh">刷新命中率</button>
+      <button id="btnTrackReconcile" data-i18n="st_reconcile">立即对比开奖</button>
+      <label><span data-i18n="st_size">规模</span>
+        <select id="trackSize">
+          <option value="">全部</option>
+          <option value="1">1码</option>
+          <option value="2">2码</option>
+          <option value="3">3码</option>
+          <option value="4">4码</option>
+        </select>
+      </label>
+    </div>
+    <div id="trackHitOut" class="output"></div>
+
+    <h3 data-i18n="st_strategy_t">策略自适应（按 last_n 窗口统计 top1 命中）</h3>
+    <div id="trackStrategyOut" class="output"></div>
+
+    <h3 data-i18n="st_recent_t">最近对比明细</h3>
+    <div id="trackRecentOut" class="output"></div>
+  </section>
+
+</main>
+
+<footer class="footnote" data-i18n="footer_note">
+  统计说明：开奖相互独立。任意 4 码组合的精确中奖概率恒为 ≈0.306%（1/326）；经验评分与置信度仅为历史相对指标，不构成对未来结果的预测或财务建议。
+</footer>
+
+<script src="/static/i18n.js"></script>
+<script src="/static/charts.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

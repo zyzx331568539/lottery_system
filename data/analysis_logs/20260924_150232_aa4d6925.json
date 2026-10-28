@@ -1,0 +1,244 @@
+{
+  "analysis_type": "daily_pick_m2",
+  "started_at": "2026-09-24T15:02:32",
+  "data_snapshot": {
+    "count": 32,
+    "first_period": 2026223,
+    "last_period": 2026254,
+    "first_date": "2026-08-21",
+    "last_date": "2026-09-21",
+    "periods": [
+      2026223,
+      2026224,
+      2026225,
+      2026226,
+      2026227,
+      2026228,
+      2026229,
+      2026230,
+      2026231,
+      2026232,
+      2026233,
+      2026234,
+      2026235,
+      2026236,
+      2026237,
+      2026238,
+      2026239,
+      2026240,
+      2026241,
+      2026242,
+      2026243,
+      2026244,
+      2026245,
+      2026246,
+      2026247,
+      2026248,
+      2026249,
+      2026250,
+      2026251,
+      2026252,
+      2026253,
+      2026254
+    ],
+    "sources": [
+      "crawl",
+      "seed"
+    ]
+  },
+  "params": {
+    "recent_window": 10,
+    "hot_z": 1.28,
+    "cold_z": -1.28,
+    "gap_cold": 8,
+    "gap_active": 1,
+    "w_full": 0.3,
+    "w_recent": 0.35,
+    "w_gap": 0.15,
+    "w_segment": 0.2,
+    "shortlist": 8,
+    "softmax_tau": 1.0,
+    "size": 2
+  },
+  "intermediate": {
+    "size": 2,
+    "hot_cold_summary": {
+      "hot": [
+        4,
+        8,
+        18,
+        29,
+        43,
+        49,
+        53,
+        54,
+        62,
+        65
+      ],
+      "cold_recent": [
+        12,
+        14,
+        25,
+        30,
+        45,
+        55,
+        60,
+        64,
+        75
+      ],
+      "cold_gap": [
+        7,
+        12,
+        14,
+        16,
+        25,
+        27,
+        30,
+        45,
+        55,
+        60,
+        64,
+        67,
+        75
+      ]
+    },
+    "segments_chi_square": 6.875,
+    "shortlist": [
+      8,
+      29,
+      42,
+      65,
+      53,
+      52,
+      28,
+      18
+    ],
+    "combo_ranked_top10": [
+      {
+        "combo": [
+          42,
+          52
+        ],
+        "score": 3.3015,
+        "parts": {
+          "number_z": 2.49,
+          "pair_z": 4.518
+        }
+      },
+      {
+        "combo": [
+          8,
+          65
+        ],
+        "score": 3.1111,
+        "parts": {
+          "number_z": 2.173,
+          "pair_z": 4.518
+        }
+      },
+      {
+        "combo": [
+          28,
+          42
+        ],
+        "score": 3.0157,
+        "parts": {
+          "number_z": 2.014,
+          "pair_z": 4.518
+        }
+      },
+      {
+        "combo": [
+          42,
+          65
+        ],
+        "score": 3.01,
+        "parts": {
+          "number_z": 2.5,
+          "pair_z": 3.775
+        }
+      },
+      {
+        "combo": [
+          52,
+          53
+        ],
+        "score": 2.7425,
+        "parts": {
+          "number_z": 2.054,
+          "pair_z": 3.775
+        }
+      },
+      {
+        "combo": [
+          52,
+          65
+        ],
+        "score": 2.6138,
+        "parts": {
+          "number_z": 2.336,
+          "pair_z": 3.031
+        }
+      },
+      {
+        "combo": [
+          8,
+          53
+        ],
+        "score": 2.3475,
+        "parts": {
+          "number_z": 1.892,
+          "pair_z": 3.031
+        }
+      },
+      {
+        "combo": [
+          28,
+          52
+        ],
+        "score": 2.3221,
+        "parts": {
+          "number_z": 1.849,
+          "pair_z": 3.031
+        }
+      },
+      {
+        "combo": [
+          8,
+          42
+        ],
+        "score": 2.3115,
+        "parts": {
+          "number_z": 2.328,
+          "pair_z": 2.287
+        }
+      },
+      {
+        "combo": [
+          8,
+          29
+        ],
+        "score": 2.3,
+        "parts": {
+          "number_z": 1.813,
+          "pair_z": 3.031
+        }
+      }
+    ]
+  },
+  "final": {
+    "size": 2,
+    "numbers": [
+      42,
+      52
+    ],
+    "combo_score": 3.3015
+  },
+  "perf": {
+    "elapsed_ms": 35.57,
+    "budget_ms": 2000,
+    "within_budget": true
+  },
+  "finished_at": "2026-09-24T15:02:32",
+  "integrity_sha256": "aa4d69253b9efbab2baa90a7bebad387a20e10e0c48465123d6f17a236b5f175"
+}
