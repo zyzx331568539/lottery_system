@@ -55,9 +55,11 @@ class TestPerformanceRegression(unittest.TestCase):
         self.assertLess(new * 8, old, f"m4 recommend 加速不足: old={old:.0f}ms new={new:.0f}ms")
 
     def test_backtest_speedup(self):
-        old = _ms(lambda: B0.run_backtest(self.recs, 20))
+        # P0-1 后回测对齐线上 recommend 路径（每期重建 Features），不再复用
+        # 旧版 slide_window_features 的增量更新，故相对旧版不再有加速比。
+        # 此处改为绝对时间上限，保证回测不会意外退化到不可接受的慢。
         new = _ms(lambda: B1.run_backtest(self.recs, 20))
-        self.assertLess(new * 1.8, old, f"backtest 加速不足: old={old:.0f}ms new={new:.0f}ms")
+        self.assertLess(new, 5000, f"backtest 耗时过高: {new:.0f}ms")
 
     def test_analyze_cache_hit_latency(self):
         recs = self.recs

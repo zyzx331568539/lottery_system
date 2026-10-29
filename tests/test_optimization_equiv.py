@@ -35,11 +35,20 @@ import predictor as P1
 from tests.test_analytics import real_records, synth_records
 
 # 性能计数字段允许不同（计时本身是测量值，非业务输出）
-_IGNORE_KEYS = {"perf_ms"}
+# method：recommend 的方法说明文案有意改为参数无关，不参与对拍
+# weights / candidate_pool_size / combo_count：recommend.basis 新增字段，不参与对拍
+# disclaimers：run_analysis 免责声明文案有意更新（引用 IC 结论），不参与对拍
+_IGNORE_KEYS = {"perf_ms", "method", "weights",
+                "candidate_pool_size", "combo_count", "disclaimers"}
 
 
 def _strip(d):
-    return {k: v for k, v in d.items() if k not in _IGNORE_KEYS}
+    """递归移除忽略字段，保证新旧实现可逐字段对拍。"""
+    if isinstance(d, dict):
+        return {k: _strip(v) for k, v in d.items() if k not in _IGNORE_KEYS}
+    if isinstance(d, list):
+        return [_strip(x) for x in d]
+    return d
 
 
 DATASETS = {
@@ -182,23 +191,45 @@ class TestAnalysisPipelineEquivalence(unittest.TestCase):
 
 
 class TestBacktestEquivalence(unittest.TestCase):
+    """回测对拍。
+
+    注意：4 码回测路径已从 run_analysis 改为与线上一致的 recommend(top_k=1)，
+    属于有意的算法变更（P0-1 回测/线上对齐），因此 4 码结果不再与 legacy 位级相等，
+    改为结构校验；m=1/2/3 路径未变，仍与 legacy 逐字段对拍。
+    """
+
+    def _assert_backtest4_valid(self, rep):
+        self.assertIsInstance(rep, dict)
+        for k in ("trials", "hit_distribution", "mean_hits",
+                  "hit_at_least_1_pct", "z_vs_baseline", "baseline", "details"):
+            self.assertIn(k, rep)
+        self.assertEqual(set(rep["hit_distribution"].keys()), {"0", "1", "2", "3", "4"})
+        self.assertEqual(len(rep["details"]), rep["trials"])
+        for d in rep["details"]:
+            self.assertIn("picked", d)
+            self.assertIn("hits", d)
+            self.assertEqual(len(d["picked"]), 4)
+
     def test_run_backtest_real_pool(self):
         recs = DATASETS["real_pool"]
         for tw in (10, 20, 30):
-            self.assertEqual(_strip(B0.run_backtest(recs, tw)),
-                             _strip(B1.run_backtest(recs, tw)), tw)
+            self._assert_backtest4_valid(B1.run_backtest(recs, tw))
 
     def test_run_backtest_synth(self):
         recs = DATASETS["synth_20"]
-        self.assertEqual(_strip(B0.run_backtest(recs, 15)),
-                         _strip(B1.run_backtest(recs, 15)))
+        self._assert_backtest4_valid(B1.run_backtest(recs, 15))
 
     def test_run_backtest_m_all_sizes(self):
         recs = DATASETS["real_pool"]
-        for m in (1, 2, 3, 4):
+        for m in (1, 2, 3):
             for tw in (15, 25):
                 self.assertEqual(_strip(M0.run_backtest_m(recs, m, tw)),
                                  _strip(M1.run_backtest_m(recs, m, tw)), (m, tw))
+        # m=4：算法已改为 recommend 路径，仅做结构校验
+        for tw in (15, 25):
+            rep = M1.run_backtest_m(recs, 4, tw)
+            self.assertEqual(rep["size"], 4)
+            self._assert_backtest4_valid(rep)
 
 
 if __name__ == "__main__":

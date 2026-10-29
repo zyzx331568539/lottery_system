@@ -5,7 +5,8 @@ backtest.py —— 算法效果历史回测
 方法
 ====
 * 严格时间切片：在第 i 期开奖前，只允许使用 records[:i]（或其最近 train_window 期），
-  调用与线上完全相同的 run_analysis() 得到4码，再用 records[i] 核对命中 0–4 个。
+  调用与线上完全相同的 recommend(top_k=1) 得到4码，再用 records[i] 核对命中 0–4 个。
+  （与线上同路径：12码候选集 → C(12,4) 评分排序 → top1）
 * 随机基准：随机选4码时命中数服从超几何分布 Hypergeometric(80, 20, 4)
     P(h=k) = C(20,k)·C(60,4-k) / C(80,4)
   任何科学筛选若连基准都跑不赢，就不具备实证有效性（这是最重要的诚实检验）。
@@ -18,9 +19,9 @@ import random
 import time
 from math import comb
 
-from analytics import AnalysisParams, run_analysis
+from analytics import AnalysisParams
 from audit_log import PerfTimer, get_logger
-from predictor import Features, slide_window_features, validate_records
+from predictor import CANDIDATE_SIZE, recommend, validate_records
 
 # ------------------------------------------------------------ 超几何基准（精确值）
 _C80_4 = comb(80, 4)
@@ -49,12 +50,16 @@ def _percentile(sorted_vals: list[float], q: float) -> float:
 
 def run_backtest(records, train_window: int | None = None,
                  params: AnalysisParams | None = None,
-                 bootstrap_rounds: int = BOOTSTRAP_ROUNDS) -> dict:
+                 bootstrap_rounds: int = BOOTSTRAP_ROUNDS,
+                 candidate_size: int | None = CANDIDATE_SIZE) -> dict:
     """
-    滑动回测。
+    滑动回测（与线上 recommend 同路径）。
       train_window：训练窗口（None=用全部历史；否则每期只用最近 train_window 期）
+      params：已废弃保留参数（recommend 使用自身固定权重，不再受 AnalysisParams 影响）。
+      candidate_size：候选集规模（默认 CANDIDATE_SIZE=12；传 None 表示全量80码枚举，
+                      计算量大，仅建议小规模验证时使用）。
     """
-    params = params or AnalysisParams()
+    # params 保留仅为向后兼容，当前回测走 recommend 路径，不使用 analytics 权重
     logger = get_logger()
     if len(records) < 6:
         raise ValueError("历史数据至少需要6期才能回测（5期训练+1期验证）")
@@ -74,16 +79,14 @@ def run_backtest(records, train_window: int | None = None,
                    extra={"trials": len(records) - tw}):
         details = []
         hits = []
-        # 滑动窗口特征：首个窗口全量构建，之后每期只做一期增量（计数整数严格相等，
-        # wfreq/统计量按同模板重建），避免每个 trial 从零计数 O(N·W·C(20,4))。
-        fx = Features(records[:tw])
+        # 与线上完全同一路径：每期调用 recommend(top_k=1) 取 top1 组合。
+        # with_confidence=False 跳过自助法，避免 200 轮重采样拖慢批量回测。
+        # 注意：recommend 内部自建 Features，故此处不再复用 fx（保持口径一致）。
         for i in range(tw, len(records)):
             train = records[i - tw:i]
-            if i > tw:
-                slide_window_features(fx, records[i - tw - 1]["numbers"],
-                                      records[i - 1]["numbers"], train)
-            result = run_analysis(train, params=params, persist=False, fx=fx)
-            picked = result["numbers"]
+            result = recommend(train, top_k=1, with_confidence=False,
+                               candidate_size=candidate_size)
+            picked = sorted(result["recommendations"][0]["combo"])
             actual = records[i]["numbers"]
             h = len(set(picked) & set(actual))
             hits.append(h)
@@ -93,7 +96,7 @@ def run_backtest(records, train_window: int | None = None,
                 "picked": picked,
                 "hits": h,
                 "hit_numbers": sorted(set(picked) & set(actual)),
-                "combo_score": result["combo_score"],
+                "combo_score": result["recommendations"][0]["score"],
             })
 
         trials = len(hits)

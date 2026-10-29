@@ -337,8 +337,9 @@ def run_analysis(records, params: AnalysisParams | None = None,
                 % (exact_probability()["percent"], exact_probability()["odds_1_in"]),
                 "model_index_pct 是80码多因子评分 softmax 后的相对指数（合计100%%），"
                 "表示模型在'若只选1码'时的相对倾向，不是该号码下期真实出现概率（真实=25%%）。",
-                "遗漏/号段回补项基于'均值回归'经验假设；在开奖独立的原假设下它们无预测力，"
-                "其实际贡献应由回测检验。",
+                "遗漏/号段回补项基于'均值回归'经验假设；IC 检验显示 gap_score 方向为负"
+                "且不显著（t≈-1.64, p≈0.10），未支持该假设；"
+                "可用 gap_ablation_analysis 查看移除 gap 后的推荐差异。",
             ],
         }
 
@@ -362,3 +363,69 @@ def run_analysis(records, params: AnalysisParams | None = None,
                          "combo_score": report["combo_score"]}, elapsed)
     report["perf_ms"] = round(elapsed, 2)
     return report
+
+
+# ============================================================ gap 特征消融验证
+def gap_ablation_analysis(records) -> dict:
+    """gap（遗漏回补）特征消融对比。
+
+    IC 检验显示 gap_score 的秩相关方向为负且不显著（t≈-1.64, p≈0.10），
+    直接否定"遗漏越久越该回补"的假设。本函数对比：
+      A) 默认权重 w_gap=0.15（含遗漏回补项）
+      B) w_gap=0（移除遗漏回补，权重按比例分给其余三项）
+    比较两者的 shortlist、最终推荐号码、推荐组合的差异。
+
+    本函数不修改默认行为，仅用于诊断 gap 特征的实际影响。
+    """
+    base = AnalysisParams()
+    # 消融：gap 权重按比例分给 w_full / w_recent / w_segment
+    others = base.w_full + base.w_recent + base.w_segment
+    no_gap = AnalysisParams(
+        w_gap=0.0,
+        w_full=round(base.w_full + base.w_gap * base.w_full / others, 4),
+        w_recent=round(base.w_recent + base.w_gap * base.w_recent / others, 4),
+        w_segment=round(base.w_segment + base.w_gap * base.w_segment / others, 4),
+    )
+
+    r_with = run_analysis(records, params=base, persist=False)
+    r_without = run_analysis(records, params=no_gap, persist=False)
+
+    short_with = r_with["shortlist"]
+    short_without = r_without["shortlist"]
+    overlap = set(short_with) & set(short_without)
+
+    top_with = r_with["numbers"]
+    top_without = r_without["numbers"]
+
+    combo_with = r_with["combo_ranked"][0]["combo"] if r_with["combo_ranked"] else []
+    combo_without = r_without["combo_ranked"][0]["combo"] if r_without["combo_ranked"] else []
+
+    return {
+        "ic_finding": ("gap_score IC: 方向为负（遗漏越久越不该选）、t≈-1.64、p≈0.10，"
+                       "统计不显著，否定'遗漏回补'假设。"),
+        "with_gap": {
+            "w_gap": base.w_gap,
+            "shortlist": short_with,
+            "top_numbers": top_with,
+            "top_combo": combo_with,
+        },
+        "without_gap": {
+            "w_gap": 0.0,
+            "weights": {"w_full": no_gap.w_full, "w_recent": no_gap.w_recent,
+                        "w_segment": no_gap.w_segment},
+            "shortlist": short_without,
+            "top_numbers": top_without,
+            "top_combo": combo_without,
+        },
+        "shortlist_overlap": {
+            "count": len(overlap),
+            "numbers": sorted(overlap),
+            "only_with_gap": sorted(set(short_with) - set(short_without)),
+            "only_without_gap": sorted(set(short_without) - set(short_with)),
+        },
+        "top_numbers_overlap": len(set(top_with) & set(top_without)),
+        "top_combo_identical": combo_with == combo_without,
+        "note": ("若 shortlist 重叠率高且 top_combo 相同，说明 gap 特征对最终推荐"
+                 "几乎无影响；若差异大，则需用回测进一步判断哪边更优。"),
+    }
+

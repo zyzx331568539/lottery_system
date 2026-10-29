@@ -25,9 +25,11 @@ from flask import Flask, jsonify, render_template, request
 from crawler import (CrawlError, Scheduler, load_config, save_config,
                      update_if_stale)
 from data_store import DataStore, ValidationError
-from predictor import analyze_combo, optimize_combo, recommend
-from analytics import run_analysis
+from predictor import CANDIDATE_SIZE, analyze_combo, optimize_combo, recommend
+from analytics import gap_ablation_analysis, run_analysis
 from backtest import run_backtest
+from feature_test import feature_predictive_test
+from weight_opt import optimize_weights_walkforward
 from msize import (analyze_combo_m, recommend_m, run_analysis_m,
                    run_backtest_m, theory_table)
 from audit_log import (list_analysis_logs, read_analysis_log,
@@ -194,11 +196,19 @@ def api_recommend():
     if not isinstance(top_k, int) or not 1 <= top_k <= 10:
         raise ValidationError("top_k 取值1-10")
     auto_strategy = bool(data.get("auto_strategy", False))
+    # candidate_size：候选集规模，默认12；传 null/省略=12，传 "all" 或 0 表示全量80码枚举
+    candidate_size = data.get("candidate_size", CANDIDATE_SIZE)
+    if isinstance(candidate_size, str):
+        candidate_size = None if candidate_size.lower() == "all" else int(candidate_size)
+    if candidate_size == 0:
+        candidate_size = None
     records = store.all()
-    result = recommend(records, last_n, top_k, auto_strategy=auto_strategy)
+    result = recommend(records, last_n, top_k, auto_strategy=auto_strategy,
+                       candidate_size=candidate_size)
     # 落盘快照，目标期号 = 池最新期号 + 1；后续开奖入库自动对比
     tracker.save_recommendation(records, 4, result,
-                                last_n=last_n, top_k=top_k)
+                                last_n=last_n, top_k=top_k,
+                                candidate_size=candidate_size)
     return jsonify({"ok": True, "result": result})
 
 
@@ -379,6 +389,18 @@ def api_hitrate():
         size=size, limit=limit)})
 
 
+@app.route("/api/confidence/calibrate", methods=["GET"])
+def api_confidence_calibrate():
+    """置信度校准：把 top1 推荐的置信度分箱，对比声称置信度与实际命中率，
+    输出 ECE（预期校准误差）。查询参数：size、limit。"""
+    size = request.args.get("size", type=int)
+    if size is not None and size not in (1, 2, 3, 4):
+        raise ValidationError("size 必须是 1/2/3/4")
+    limit = request.args.get("limit", type=int)
+    return jsonify({"ok": True, "report": tracker.calibrate_confidence(
+        size=size, limit=limit)})
+
+
 @app.route("/api/strategy/stats", methods=["GET"])
 def api_strategy_stats():
     """按 (size, last_n) 统计的历史命中表 + 推荐策略。"""
@@ -390,6 +412,40 @@ def api_strategy_stats():
     for sz in (size,) if size else (1, 2, 3, 4):
         suggested[sz] = tracker.best_strategy(sz)
     return jsonify({"ok": True, "stats": stats, "suggested": suggested})
+
+
+@app.route("/api/feature/ic", methods=["GET"])
+def api_feature_ic():
+    """特征预测力检验（IC）：逐期滚动计算各号码级特征与下一期开出结果的
+    Spearman 秩相关，输出 mean_ic / t_stat / p_value / 判读。"""
+    min_train = request.args.get("min_train", default=10, type=int)
+    report = feature_predictive_test(store.all(), min_train=min_train)
+    return jsonify({"ok": True, "report": report})
+
+
+@app.route("/api/weights/optimize", methods=["POST"])
+def api_weights_optimize():
+    """评分权重的嵌套 walk-forward 优化：对比"自适应权重"vs"默认权重"的
+    历史 top1 命中表现。计算较重，按需调用。"""
+    data = _payload() or {}
+    min_outer = data.get("min_outer", 25)
+    inner_window = data.get("inner_window", 15)
+    if not isinstance(min_outer, int) or min_outer < 15:
+        raise ValidationError("min_outer 必须是 >=15 的整数")
+    if not isinstance(inner_window, int) or inner_window < 5:
+        raise ValidationError("inner_window 必须是 >=5 的整数")
+    report = optimize_weights_walkforward(store.all(),
+                                          min_outer=min_outer,
+                                          inner_window=inner_window)
+    return jsonify({"ok": True, "report": report})
+
+
+@app.route("/api/gap/ablation", methods=["GET"])
+def api_gap_ablation():
+    """gap（遗漏回补）特征消融：对比含 gap 权重 vs 移除 gap 后的 shortlist/
+    推荐号码差异。结合 IC 结论判断 gap 特征是否应保留。"""
+    report = gap_ablation_analysis(store.all())
+    return jsonify({"ok": True, "report": report})
 
 
 if __name__ == "__main__":

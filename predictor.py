@@ -246,6 +246,8 @@ class Features:
         self.wfreq = Counter()
         self.pair = Counter()
         self.four = Counter()
+        self.trans_appear = Counter()   # 号码 x 在第 t 期出现的次数（t 从 0 到 n-2）
+        self.trans_stay = Counter()     # 号码 x 在 t 期出现且 t+1 期也出现的次数
         self._observed_scores = None      # 懒加载：历史观测组合评分有序表
         self._observed_scores_extra = {}  # 懒加载：1/2/3 码等其他规模的评分有序表
         self._build()
@@ -271,6 +273,14 @@ class Features:
                 self.wfreq[n] += w
             self.pair.update(combinations(nums, 2))
             self.four.update(combinations(nums, 4))
+        # 一阶转移统计：x 在 t 期出现 → t+1 期是否仍出现
+        for i in range(self.n - 1):
+            cur = set(self.records[i]["numbers"])
+            nxt = set(self.records[i + 1]["numbers"])
+            for x in cur:
+                self.trans_appear[x] += 1
+                if x in nxt:
+                    self.trans_stay[x] += 1
 
     def observed_scores_sorted(self):
         """历史真实出现过的全部四码组合评分（升序，懒加载并缓存）。"""
@@ -296,37 +306,80 @@ class Features:
             return 0.0
         return (self.four[tuple(sorted(c))] - self.m_4) / (self.sd_4 or 1e-9)
 
-    def candidates(self):
-        """12码候选集：评分前16 + 八区保底1个"""
+    def z_transition(self, n):
+        """一阶转移 z 值：号码 n 上期出现后本期仍出现的概率 vs H0=0.25。
+
+        z = (p_hat - 0.25) / sqrt(0.25 * 0.75 / N)
+        正 z → 热号惯性（上期出现后更可能再出现）；负 z → 冷号反转。
+        本特征默认不参与 combo_score（保持向后兼容），由调用方按需使用。
+        """
+        appear = self.trans_appear[n]
+        if appear == 0:
+            return 0.0
+        p_hat = self.trans_stay[n] / appear
+        se = sqrt(0.25 * 0.75 / appear)
+        return (p_hat - 0.25) / (se or 1e-9)
+
+    def transition_table(self) -> list:
+        """返回全部 80 个号码的一阶转移统计（按 z_transition 降序）。"""
+        rows = []
+        for n in range(1, 81):
+            appear = self.trans_appear[n]
+            stay = self.trans_stay[n]
+            p_hat = stay / appear if appear else 0.0
+            rows.append({
+                "number": n,
+                "appear": appear,
+                "stay": stay,
+                "p_stay": round(p_hat, 4),
+                "z_transition": round(self.z_transition(n), 3),
+            })
+        rows.sort(key=lambda r: (-r["z_transition"], r["number"]))
+        return rows
+
+    def candidates(self, size: int | None = CANDIDATE_SIZE):
+        """候选集：评分前列 + 八区保底。
+
+        size: 候选集规模（默认 CANDIDATE_SIZE=12）。
+              None 表示返回全部 80 个号码（全量枚举 C(80,4)，计算量大，
+              仅建议 with_confidence=False 时使用）。
+        """
         order = sorted(range(1, 81), key=lambda n: (-self.z_num(n), n))
-        base = order[:16]
+        if size is None:
+            return order
+        base = order[:max(size, 16)]
         pool = set()
         for z in range(8):
             cand = [n for n in base if (n - 1) // 10 == z]
             if cand:
                 pool.add(cand[0])
         for n in base:
-            if len(pool) >= CANDIDATE_SIZE:
+            if len(pool) >= size:
                 break
             pool.add(n)
         return sorted(pool)
 
-    def combo_score(self, c):
-        """组合总分 + 各分量（可解释）"""
+    def combo_score(self, c, weights=None):
+        """组合总分 + 各分量（可解释）。
+
+        weights: 可选 (W_NUM, W_PAIR, W_FOUR, W_SPREAD)，None 时用模块默认常量。
+        """
         c = tuple(sorted(c))
+        wn, wp, wf, ws = weights if weights is not None \
+            else (W_NUM, W_PAIR, W_FOUR, W_SPREAD)
         v_num = sum(self.z_num(n) for n in c) / 4
         v_pair = sum(self.z_pair(a, b) for a, b in combinations(c, 2)) / 6
         v_four = self.z_four(c)
         v_spread = (len({(n - 1) // 10 for n in c}) - 1) / 3
-        score = W_NUM * v_num + W_PAIR * v_pair + W_FOUR * v_four + W_SPREAD * v_spread
+        score = wn * v_num + wp * v_pair + wf * v_four + ws * v_spread
         return score, {"number_z": round(v_num, 3), "pair_z": round(v_pair, 3),
                        "four_z": round(v_four, 3), "spread": round(v_spread, 3)}
 
-    def ranked_combos(self, pool=None):
+    def ranked_combos(self, pool=None, weights=None):
         pool = pool or self.candidates()
         rows = []
         for c in combinations(pool, 4):
-            score, parts = self.combo_score(c)
+            score, parts = self.combo_score(c, weights=weights)
             rows.append({"combo": c, "score": score, "parts": parts})
         rows.sort(key=lambda r: (-r["score"], r["combo"]))
         return rows
@@ -434,19 +487,24 @@ class _SampledFeatures(Features):
             return 0.0
         return float(self._znum_arr[n])
 
-    def candidates_vectorized(self):
+    def candidates_vectorized(self, size: int | None = CANDIDATE_SIZE):
         """Features.candidates 的向量化版本：80 码 z 排序一次完成，
-        八区保底/补足逻辑与原方法逐步相同，返回同一有序列表。"""
+        八区保底/补足逻辑与原方法逐步相同，返回同一有序列表。
+
+        size 与 candidates() 语义一致：None=全量80码，否则取指定规模。
+        """
         nums = np.arange(1, 81, dtype=np.int64)
         order = nums[np.lexsort((nums, -self._znum_arr[1:81]))].tolist()
-        base = order[:16]
+        if size is None:
+            return order
+        base = order[:max(size, 16)]
         pool = set()
         for z in range(8):
             cand = [n for n in base if (n - 1) // 10 == z]
             if cand:
                 pool.add(cand[0])
         for n in base:
-            if len(pool) >= CANDIDATE_SIZE:
+            if len(pool) >= size:
                 break
             pool.add(n)
         return sorted(pool)
@@ -692,12 +750,17 @@ def bootstrap_stability(records, targets, rounds=BOOTSTRAP_ROUNDS, seed=BOOTSTRA
     return {t: hits[t] / rounds for t in targets}
 
 
-def recommend(records, last_n=None, top_k=5, auto_strategy=False):
+def recommend(records, last_n=None, top_k=5, auto_strategy=False,
+              with_confidence=True, weights=None, candidate_size=CANDIDATE_SIZE):
     """
     N+1 日推荐。
     last_n: 只使用最近N期（None=全部；会与数据池整体合并，池本身即累积数据）
     auto_strategy: True 时用 tracker 历史命中率最优的 last_n 覆盖本参数
                    （样本不足或无显著优势则仍用 last_n 默认值，安全回退）。
+    with_confidence: False 时跳过自助稳定度计算（回测批量调用时大幅提速）。
+    weights: 可选 (W_NUM, W_PAIR, W_FOUR, W_SPREAD)，None 时用模块默认常量。
+    candidate_size: 候选集规模（默认12）。None 表示全量80码枚举（C(80,4)≈158万组，
+                    计算量大，建议 with_confidence=False）。
     返回推荐组合 + 置信度 + 方法说明
     """
     if not records:
@@ -707,25 +770,34 @@ def recommend(records, last_n=None, top_k=5, auto_strategy=False):
         raise ValidationError(f"近N期参数非法：{last_n!r}")
     if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k <= 0:
         raise ValidationError(f"推荐条数非法：{top_k!r}")
+    if candidate_size is not None and (
+            isinstance(candidate_size, bool)
+            or not isinstance(candidate_size, int) or candidate_size < 4):
+        raise ValidationError(f"候选集规模非法：{candidate_size!r}（需>=4或None）")
     if auto_strategy:
         # 延迟导入避免循环依赖；无合格策略时 best_strategy 返回 None
         from tracker import best_strategy
         picked = best_strategy(4)
         if picked is not None:
             last_n = picked["last_n"]
+            candidate_size = picked.get("candidate_size", candidate_size)
     use = records if last_n is None else records[-last_n:]
     if len(use) < 5:
         raise ValidationError(f"有效历史仅{len(use)}期，至少需要5期才能形成统计")
 
     fx = Features(use)
-    pool = fx.candidates()
-    ranked = fx.ranked_combos(pool)
+    pool = fx.candidates(size=candidate_size)
+    ranked = fx.ranked_combos(pool, weights=weights)
     scores = [r["score"] for r in ranked]
     mu = sum(scores) / len(scores)
     sd = sqrt(sum((s - mu) ** 2 for s in scores) / len(scores)) or 1e-9
 
     targets = [r["combo"] for r in ranked[:top_k]]
-    stability = bootstrap_stability(use, targets)
+    if with_confidence:
+        stability = bootstrap_stability(use, targets)
+    else:
+        # 回测加速：跳过自助，稳定度占位 0.5（不影响排序与命中数）
+        stability = {t: 0.5 for t in targets}
 
     sample_factor = min(1.0, len(use) / 50)
     out = []
@@ -739,15 +811,25 @@ def recommend(records, last_n=None, top_k=5, auto_strategy=False):
                     "score_parts": r["parts"], "confidence": conf,
                     "confidence_label": label,
                     "stability": round(stability[t], 2), "margin": round(margin, 2)})
+    eff_weights = weights if weights is not None else (W_NUM, W_PAIR, W_FOUR, W_SPREAD)
+    pool_size = len(pool)
     return {
         "recommendations": out,
         "candidate_pool": pool,
         "basis": {"periods_used": len(use),
                   "first_period": use[0]["period"], "last_period": use[-1]["period"],
-                  "sample_factor": round(sample_factor, 2)},
+                  "sample_factor": round(sample_factor, 2),
+                  "candidate_pool_size": pool_size,
+                  "combo_count": len(ranked),
+                  "weights": {"number": round(eff_weights[0], 3),
+                              "pair": round(eff_weights[1], 3),
+                              "four": round(eff_weights[2], 3),
+                              "spread": round(eff_weights[3], 3)}},
         "theory": exact_probability(),
-        "method": ("12码候选集(八区保底)内枚举495组，按 .40号码z+.30共现z+.25四码共现z+"
-                   ".05分区离散 排序；置信度=固定种子自助200轮稳定度/区分裕度/样本充分度。"),
+        "method": (f"{pool_size}码候选集(八区保底)内枚举{len(ranked)}组，"
+                   "按号码z/两两共现z/四码共现z/分区离散加权排序"
+                   "（具体权重见 basis.weights）；"
+                   "置信度=固定种子自助200轮稳定度/区分裕度/样本充分度。"),
         "disclaimer": ("置信度是历史数据内部的相对指标，不是中奖概率；任意4码真实中奖概率恒为"
                        f"{P4*100:.3f}%(约1/{1/P4:.0f})。"),
     }

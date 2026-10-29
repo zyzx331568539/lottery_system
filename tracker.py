@@ -118,12 +118,14 @@ def _normalize_combos(recommendations) -> list:
 
 # ---------------------------------------------------------------- 写入推荐快照
 def save_recommendation(records, size: int, result: dict,
-                        last_n=None, top_k: int = 5) -> dict:
+                        last_n=None, top_k: int = 5,
+                        candidate_size=None) -> dict:
     """把一次推荐结果落盘为快照，返回该快照 dict。
 
     result 为 ``predictor.recommend`` / ``msize.recommend_m`` 的返回值。
     target_period 由 records 末期 +1 推导；同一目标期同一规模会保留多条快照
     （用户可能多次点击），查询时按生成时间取最新即可。
+    candidate_size：候选集规模（None 表示使用默认12），用于 auto_strategy 统计。
     """
     if not isinstance(size, int) or size not in (1, 2, 3, 4):
         raise ValidationError("size 必须是 1/2/3/4")
@@ -134,7 +136,8 @@ def save_recommendation(records, size: int, result: dict,
         "size": size,
         "recommendations": _normalize_combos(result.get("recommendations", [])),
         "candidate_pool": sorted(int(x) for x in result.get("candidate_pool", [])),
-        "strategy": {"last_n": last_n, "top_k": int(top_k)},
+        "strategy": {"last_n": last_n, "top_k": int(top_k),
+                     "candidate_size": candidate_size},
         "basis": dict(result.get("basis", {}) or {}),
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "compared": False,
@@ -327,6 +330,97 @@ def hit_rate_report(size: int | None = None, limit: int | None = None) -> dict:
     return out
 
 
+# 默认置信度分箱：与 recommend 的 confidence_label 阈值对齐
+DEFAULT_BINS = [(0.0, 0.30, "Low"),
+                (0.30, 0.45, "Low-Mid"),
+                (0.45, 0.65, "Moderate"),
+                (0.65, 1.01, "High")]
+
+
+def calibrate_confidence(size: int | None = None,
+                         limit: int | None = None,
+                         bins=None) -> dict:
+    """置信度校准：把 top1 推荐的置信度分箱，对比"声称置信度"与"实际命中率"。
+
+    只有已对比（compared=True 且有 result）的快照参与。
+    命中口径：top1 组合命中 ≥1 个号视为"命中"（与 hit_rate_report 的 top1 一致）。
+
+    返回每个分箱的样本数 / 平均置信度 / 实际命中率 / 平均命中数，
+    以及整体校准误差（ECE：加权平均 |mean_conf - hit_rate|）。
+    """
+    bins = bins or DEFAULT_BINS
+    recs = [r for r in _load()["records"] if r.get("compared") and r.get("result")]
+    if size is not None:
+        recs = [r for r in recs if r.get("size") == size]
+    recs = sorted(recs, key=lambda r: r.get("compared_at", ""), reverse=True)
+    if limit is not None:
+        recs = recs[:limit]
+
+    rows = []
+    for lo, hi, label in bins:
+        bucket = []
+        for r in recs:
+            recs_list = r.get("recommendations", [])
+            if not recs_list:
+                continue
+            conf = float(recs_list[0].get("confidence", 0.0))
+            if lo <= conf < hi:
+                hit = int(r["result"].get("top1_hit", 0))
+                bucket.append((conf, hit))
+        if bucket:
+            mean_conf = sum(c for c, _ in bucket) / len(bucket)
+            hit_rate = sum(1 for _, h in bucket if h >= 1) / len(bucket)
+            mean_hits = sum(h for _, h in bucket) / len(bucket)
+        else:
+            mean_conf = hit_rate = mean_hits = 0.0
+        rows.append({
+            "bin": label,
+            "range": [round(lo, 2), round(hi, 2)],
+            "samples": len(bucket),
+            "mean_confidence": round(mean_conf, 4),
+            "actual_hit_rate": round(hit_rate, 4),
+            "mean_hits": round(mean_hits, 4),
+        })
+
+    total = sum(r["samples"] for r in rows)
+    # 预期校准误差 ECE = Σ (n_k/N) * |mean_conf_k - hit_rate_k|
+    ece = 0.0
+    if total > 0:
+        for r in rows:
+            if r["samples"] > 0:
+                ece += (r["samples"] / total) * abs(r["mean_confidence"]
+                                                    - r["actual_hit_rate"])
+
+    # 整体：平均声称置信度 vs 实际命中率
+    if total > 0:
+        all_conf = []
+        all_hit_yn = []
+        for r in recs:
+            recs_list = r.get("recommendations", [])
+            if not recs_list:
+                continue
+            all_conf.append(float(recs_list[0].get("confidence", 0.0)))
+            all_hit_yn.append(1 if r["result"].get("top1_hit", 0) >= 1 else 0)
+        overall_mean_conf = sum(all_conf) / len(all_conf)
+        overall_hit_rate = sum(all_hit_yn) / len(all_hit_yn)
+    else:
+        overall_mean_conf = overall_hit_rate = 0.0
+
+    return {
+        "samples": total,
+        "size_filter": size,
+        "recent_limit": limit,
+        "bins": rows,
+        "overall": {
+            "mean_confidence": round(overall_mean_conf, 4),
+            "actual_hit_rate": round(overall_hit_rate, 4),
+        },
+        "ece": round(ece, 4),
+        "note": ("ECE 越接近 0 校准越好。若 mean_confidence > actual_hit_rate，"
+                 "说明置信度被高估；反之低估。样本过少时仅供参考。"),
+    }
+
+
 def _verdict(mean_top1: float, z: float, n: int, size: int) -> str:
     base_mean = size * 20 / 80
     if n < MIN_STRATEGY_SAMPLES:
@@ -342,9 +436,10 @@ def _verdict(mean_top1: float, z: float, n: int, size: int) -> str:
 
 # ---------------------------------------------------------------- 策略自适应
 def strategy_stats(size: int | None = None) -> list:
-    """按 (size, last_n) 聚合已对比快照的 top1 平均命中，供选参。
+    """按 (size, last_n, candidate_size) 聚合已对比快照的 top1 平均命中，供选参。
 
     last_n=None 记为 "all"（使用全部历史）。
+    candidate_size=None（旧快照）记为默认 12。
     """
     groups: dict = {}
     for r in _load()["records"]:
@@ -352,19 +447,25 @@ def strategy_stats(size: int | None = None) -> list:
             continue
         if size is not None and r.get("size") != size:
             continue
-        ln = r.get("strategy", {}).get("last_n")
-        key = (r["size"], "all" if ln is None else ln)
+        strat = r.get("strategy", {}) or {}
+        ln = strat.get("last_n")
+        cs = strat.get("candidate_size")
+        if cs is None:
+            cs = 12  # 旧快照未记录，按默认值回填
+        key = (r["size"], "all" if ln is None else ln, cs)
         g = groups.setdefault(key, {"size": r["size"], "last_n": ln,
+                                    "candidate_size": cs,
                                     "samples": 0, "top1_hits": [],
                                     "best_hits": []})
         g["samples"] += 1
         g["top1_hits"].append(r["result"]["top1_hit"])
         g["best_hits"].append(r["result"]["best_hit"])
     rows = []
-    for (sz, _ln), g in groups.items():
+    for (_sz, _ln, _cs), g in groups.items():
         rows.append({
-            "size": sz,
+            "size": g["size"],
             "last_n": g["last_n"],
+            "candidate_size": g["candidate_size"],
             "samples": g["samples"],
             "mean_top1": round(sum(g["top1_hits"]) / g["samples"], 4),
             "mean_best": round(sum(g["best_hits"]) / g["samples"], 4),
@@ -377,19 +478,21 @@ def strategy_stats(size: int | None = None) -> list:
 
 def best_strategy(size: int, min_samples: int = MIN_STRATEGY_SAMPLES,
                   edge: float = STRATEGY_EDGE) -> dict | None:
-    """返回 size 下历史最优的 last_n；不满足门槛则返回 None（用默认）。
+    """返回 size 下历史最优的 (last_n, candidate_size)；不满足门槛则返回 None（用默认）。
 
     选择规则：在样本数 ≥ min_samples 的策略中，取 top1 平均命中最高者；
-    若其相对默认（last_n=None）优势 < edge，则不切换（避免噪声抖动）。
+    若其相对默认（last_n=None, candidate_size=12）优势 < edge，则不切换（避免噪声）。
     """
     rows = [r for r in strategy_stats(size) if r["samples"] >= min_samples]
     if not rows:
         return None
     rows.sort(key=lambda x: -x["mean_top1"])
     best = rows[0]
-    default = next((r for r in rows if r["last_n"] is None), None)
+    default = next((r for r in rows
+                    if r["last_n"] is None and r["candidate_size"] == 12), None)
     if default is not None and best["mean_top1"] - default["mean_top1"] < edge:
         return None
     return {"size": size, "last_n": best["last_n"],
+            "candidate_size": best["candidate_size"],
             "samples": best["samples"],
             "mean_top1": best["mean_top1"]}

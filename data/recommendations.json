@@ -473,6 +473,274 @@
     "top1_hit": 1,
     "candidate_hits": 4
    }
+  },
+  {
+   "id": "20261028_173527_465567_9cc0a5e0",
+   "target_period": 2026287,
+   "target_date": null,
+   "size": 4,
+   "recommendations": [
+    {
+     "combo": [
+      9,
+      37,
+      52,
+      63
+     ],
+     "score": 3.3285,
+     "confidence": 0.57
+    },
+    {
+     "combo": [
+      9,
+      15,
+      61,
+      73
+     ],
+     "score": 3.2909,
+     "confidence": 0.559
+    },
+    {
+     "combo": [
+      9,
+      37,
+      52,
+      72
+     ],
+     "score": 3.287,
+     "confidence": 0.579
+    },
+    {
+     "combo": [
+      9,
+      15,
+      61,
+      63
+     ],
+     "score": 3.1722,
+     "confidence": 0.559
+    },
+    {
+     "combo": [
+      9,
+      37,
+      52,
+      68
+     ],
+     "score": 3.1685,
+     "confidence": 0.561
+    }
+   ],
+   "candidate_pool": [
+    8,
+    9,
+    15,
+    37,
+    43,
+    44,
+    52,
+    61,
+    63,
+    68,
+    72,
+    73
+   ],
+   "strategy": {
+    "last_n": null,
+    "top_k": 5
+   },
+   "basis": {
+    "periods_used": 64,
+    "first_period": 2026223,
+    "last_period": 2026286,
+    "sample_factor": 1.0
+   },
+   "generated_at": "2026-10-28T17:35:27",
+   "compared": true,
+   "compared_at": "2026-10-29T08:29:04",
+   "result": {
+    "actual": [
+     2,
+     9,
+     16,
+     19,
+     24,
+     25,
+     50,
+     55,
+     56,
+     58,
+     64,
+     66,
+     67,
+     68,
+     70,
+     73,
+     75,
+     76,
+     77,
+     79
+    ],
+    "per_combo": [
+     {
+      "combo": [
+       9,
+       37,
+       52,
+       63
+      ],
+      "hits": 1,
+      "hit_numbers": [
+       9
+      ],
+      "confidence": 0.57
+     },
+     {
+      "combo": [
+       9,
+       15,
+       61,
+       73
+      ],
+      "hits": 2,
+      "hit_numbers": [
+       9,
+       73
+      ],
+      "confidence": 0.559
+     },
+     {
+      "combo": [
+       9,
+       37,
+       52,
+       72
+      ],
+      "hits": 1,
+      "hit_numbers": [
+       9
+      ],
+      "confidence": 0.579
+     },
+     {
+      "combo": [
+       9,
+       15,
+       61,
+       63
+      ],
+      "hits": 1,
+      "hit_numbers": [
+       9
+      ],
+      "confidence": 0.559
+     },
+     {
+      "combo": [
+       9,
+       37,
+       52,
+       68
+      ],
+      "hits": 2,
+      "hit_numbers": [
+       9,
+       68
+      ],
+      "confidence": 0.561
+     }
+    ],
+    "best_hit": 2,
+    "best_hit_index": 1,
+    "top1_hit": 1,
+    "candidate_hits": 3
+   }
+  },
+  {
+   "id": "20261029_083026_248473_32e3aa08",
+   "target_period": 2026288,
+   "target_date": null,
+   "size": 4,
+   "recommendations": [
+    {
+     "combo": [
+      9,
+      15,
+      61,
+      73
+     ],
+     "score": 3.317,
+     "confidence": 0.559
+    },
+    {
+     "combo": [
+      9,
+      37,
+      52,
+      63
+     ],
+     "score": 3.2782,
+     "confidence": 0.57
+    },
+    {
+     "combo": [
+      9,
+      37,
+      52,
+      72
+     ],
+     "score": 3.2344,
+     "confidence": 0.568
+    },
+    {
+     "combo": [
+      9,
+      37,
+      52,
+      68
+     ],
+     "score": 3.1938,
+     "confidence": 0.566
+    },
+    {
+     "combo": [
+      9,
+      15,
+      61,
+      63
+     ],
+     "score": 3.1249,
+     "confidence": 0.557
+    }
+   ],
+   "candidate_pool": [
+    8,
+    9,
+    15,
+    37,
+    43,
+    52,
+    55,
+    61,
+    63,
+    68,
+    72,
+    73
+   ],
+   "strategy": {
+    "last_n": null,
+    "top_k": 5
+   },
+   "basis": {
+    "periods_used": 65,
+    "first_period": 2026223,
+    "last_period": 2026287,
+    "sample_factor": 1.0
+   },
+   "generated_at": "2026-10-29T08:30:26",
+   "compared": false,
+   "compared_at": null,
+   "result": null
   }
  ]
 }
